@@ -9,9 +9,15 @@ sub printHelp
 #          olcao.skl skeleton input file.
 #
 #AUTHOR:   Alysse Weigand
-#LAST MODIFIED: April 16, 2024          
+#LAST MODIFIED: April 11, 2025          
 #USAGE:    xdatcar2skl
-#COMMANDS: -s (sampling rate)
+#COMMANDS:
+#  -sr <rate>       Set the sampling rate. This will sample every <rate> configuration and create skl files.
+#  -sn <number>     Set the sample number (single). This will pull a single configuration (<number>) and create a skl file.
+#  -d               Enable dipole flag. Only for use with dipole series. 
+#  -skl             This will print skl as olcao.skl.<config_number>. Must not be activated for -d. If not activated skl files will overwrite eachother.
+#  -h, -help        Show this help message and exit
+#
 ###############################################################################
 ENDHELP
    exit;
@@ -46,6 +52,11 @@ my @values;
 my $difference;
 my ($i, $j, $k, $m);
 my $samplingRate;
+my $sampleNumber;
+my $dipoleFlag;
+my $seriesFlag;
+my $singleFlag;
+my $sklPrintFlag;
 
 # Initialize the default values.
 &assignDefaults;
@@ -69,6 +80,10 @@ sub assignDefaults
    # Define the default parameter values.
    $inputFile = "XDATCAR";
    $atomFile = "POTCAR";
+   $dipoleFlag = 0;
+   $seriesFlag = 0;
+   $singleFlag = 0;
+   $sklPrintFlag = 0;
 }
 
 # Parse the command line.
@@ -81,14 +96,31 @@ sub parseCommandLine
 
    while ($number < scalar(@ARGV))
    {
-      if ($ARGV[$number] eq "-s")
-         {$samplingRate = $ARGV[++$number];}
-      elsif ($ARGV[$number] eq "-help")
-         {&printHelp;}
-      else
-      {
-         print STDOUT "UNKNOWN COMMAND LINE PARAMETER $ARGV[$number]. BYE.\n";
+      if ($ARGV[$number] eq "-sr") {
+         $number++;
+         die "Missing value for -sr\n" if $number >= scalar(@ARGV);
+         $samplingRate = $ARGV[$number];
+         $seriesFlag = 1;
+      }
+      elsif ($ARGV[$number] eq "-sn") {
+         $number++;
+         die "Missing value for -sn\n" if $number >= scalar(@ARGV);
+         $sampleNumber = $ARGV[$number];
+         $singleFlag = 1;
+      }
+      elsif ($ARGV[$number] eq "-d") {
+         $dipoleFlag = 1;
+      }
+      elsif ($ARGV[$number] eq "-skl") {
+         $sklPrintFlag = 1;
+      }
+      elsif ($ARGV[$number] eq "-help" || $ARGV[$number] eq "-h") {
+         printHelp();  # Assuming this subroutine exists
          exit;
+      }
+      else {
+         print STDERR "UNKNOWN COMMAND LINE PARAMETER $ARGV[$number]. BYE.\n";
+         exit 1;
       }
 
       if ($number > scalar(@ARGV))
@@ -330,16 +362,47 @@ sub readVASP
          }
 
          # We only want to print out the skl files that fall within out sampling rate
-         if ($i % $samplingRate == 0 or $i == 1)
+         if ($seriesFlag == 1)
          {
-            $m++;
-            $outputFile = "olcao.skl";
-            open (SKL,">$outputFile") || die "Cannot open $outputFile for writing.\n";
-            &printSkl;
+            if ($i % $samplingRate == 0 or $i == 1)
+            {
+               $m++;
+               if ($sklPrintFlag == 1)
+               {
+                  $outputFile = "olcao.skl.$i"
+               }
+               else
+               {
+                  $outputFile = "olcao.skl"
+               }
 
-            # Call the seriesData.py script on the newly created .skl file
-            system("seriesData.py") == 0
-               or die "Failed to execute seriesData.py:  $!";
+               open (SKL,">$outputFile") || die "Cannot open $outputFile for writing.\n";
+               &printSkl;
+
+               # Call the seriesData.py script on the newly created .skl file
+               if ($dipoleFlag == 1 and $sklPrintFlag == 0)
+               {
+                  system("seriesData.py") == 0
+                  or die "Failed to execute seriesData.py:  $!";
+               }
+               else
+               {
+               }
+            }
+
+         }
+         elsif ($singleFlag == 1) 
+         {
+            if ($i == $sampleNumber)
+            {
+               $m++;
+               $outputFile = "olcao.skl";
+               open (SKL,">$outputFile") || die "Cannot open $outputFile for writing.\n";
+               &printSkl;
+            }
+            else
+            {
+            }
          }
          else
          {
@@ -354,6 +417,9 @@ sub readVASP
    # Close the VASP input file.
    close (VASP);
 }
+
+# NOTE for new olcao this will need to inclue a line for a flag
+# #   that fixes the "return" issue with the atoms
 
 sub printSkl
 {
