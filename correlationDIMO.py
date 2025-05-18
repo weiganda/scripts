@@ -10,7 +10,7 @@
 #           calculations.
 #
 # AUTHOR:   Alysse Weigand
-# LAST MODIFIED: April 1, 2025
+# LAST MODIFIED: May 12, 2025
 # USAGE:    Low frequency dielectric function calculation
 
 
@@ -82,40 +82,36 @@ def dipole_correlation_function(vectors):
     # Ensure that the vectors are in array format
     vectors = np.array(vectors)
     
-    # Extract data for x, y, and z dimensions
+    # Extract data for x, y, and z dimensions and get the magnitude
     x_values = vectors[:, 0]
     y_values = vectors[:, 1]
     z_values = vectors[:, 2]
+    magnitude = np.linalg.norm(vectors, axis=1)
 
+    # Get the length of array for the acf
     length = len(x_values) - 1 
 
+    # Run the autocorrelation function on x,y,z, and magnitude
+    #   Note that this is a normalized acf.
     acf_x = acf(x_values, nlags=length)
     acf_y = acf(y_values, nlags=length)  
-    acf_z = acf(z_values, nlags=length) 
-
-    # Calculate the leading term ⟨Mi(0) Mj(0)⟩ for each component
-    leading_term_x = x_values[0]**2
-    leading_term_y = y_values[0]**2
-    leading_term_z = z_values[0]**2
-    leading_term_avg = np.mean([leading_term_x, leading_term_y, leading_term_z])
-
-    print(f"⟨Mx(0) Mx(0)⟩: {leading_term_x}")
-    print(f"⟨My(0) My(0)⟩: {leading_term_y}")
-    print(f"⟨Mz(0) Mz(0)⟩: {leading_term_z}")
-    print(f"⟨M(0) M(0)⟩: {leading_term_avg}")
-
+    acf_z = acf(z_values, nlags=length)
+    dipole_correlation = acf(magnitude, nlags=length)
+    
+    # Calculate the leading term ⟨M(0) M(0)⟩
+    leading_term = magnitude[0]**2
+    print(f"⟨M(0) M(0)⟩: {leading_term}")
 
     # Combine ACF values into a single array
-    
     for i in range(length + 1):
         acf_vector = [acf_x[i], acf_y[i], acf_z[i]]
         acf_xyz.append(acf_vector)
-        acf_avgs = np.mean(acf_vector) 
-        dipole_correlation.append(acf_avgs) 
 
     # Save the average ACF values to a CSV file
     avg_acf_df = pd.DataFrame(dipole_correlation, columns=["ACF_tot"])
     avg_acf_df.to_csv("dipole_correlation_avg.csv", index=False)
+
+
 
     # Save xyz correlation data to CSV
     correlation_df = pd.DataFrame(acf_xyz, columns=["ACF_x", "ACF_y", "ACF_z"])
@@ -190,7 +186,7 @@ def dipole_correlation_function(vectors):
     plt.savefig("dipole_correlation_plot.png")
     plt.show()
 
-    return dipole_correlation, leading_term_avg
+    return dipole_correlation, leading_term
 
 #--------- Tested and confirmed 3/29/25
 def numerical_derivative(signal, steps, step_size):
@@ -213,12 +209,12 @@ def perform_fft(signal, sampling_interval):
 
     # Extract the real and imaginary parts 
     fft_real = np.real(fft_result)
-    fft_imag = np.imag(fft_result)
+    fft_imag = - np.imag(fft_result)
 
     # Only keep the positive frequencies
     positive_freqs = fft_freqs[:num_samples // 2]
     real_fft = fft_real[:num_samples // 2]
-    imag_fft = - fft_imag[:num_samples // 2] # Phase information 180*
+    imag_fft = fft_imag[:num_samples // 2] # Phase information 180*
 
     # Create a figure with two subplots (2 rows, 1 column)
     fig, axes = plt.subplots(2, 1, figsize=(10, 8))
@@ -267,32 +263,28 @@ def apply_constant(real_fft, imag_fft, vol, leading_term_avg):
     #   Since it is cubed, 1 a_0^3 = 0.1481847435 A^3
     vol = vol / 0.1481847435
 
-    # Boltzmann in au Ha/K * eV/Ha
-    k_B = 3.1668119646e-6 #* 27.2114
-
-    # Boltzamm in Hz/K
-    #k_B = 2.083661912e10
-
-    #Boltzmann in eV/K
-    #k_B = 8.61733262e-5
+    # Boltzmann 
+    #k_B = 2.083661912e10 #Hz/K
+    #k_B = 3.1668114e-6 #hartree/K
+    k_B = 8.61733e-5 #eV/K
 
     # Leading Term in a.u. 
-    term = 4 * np.pi / (vol * k_B * temp)
-
+    term = ((4 * np.pi * leading_term_avg) / (vol * k_B * temp))
     print(f"Term: {term}")
 
-    # Apply leading term
-    dipole_angst_imag = (leading_term_avg * imag_fft)
-    dipole_angst_real = (leading_term_avg * real_fft)
+    # Unit conversion factors in cgs and eV
+    hart_to_eV = 27.2114
+    bohr_to_cm = 5.29177210903e-9
+    e_to_charge = 1.60217663e-19
+    h_plank = 6.62607015e-34
 
-    # So this is without the leading term 
-    #dipole_angst_imag = imag_fft
-    #dipole_angst_real = real_fft
+    dipole_cgs_real = 1 + (term * real_fft) 
+    dipole_cgs_imag = 1 + (term * imag_fft) 
 
     # This is leaving me with weird units
-    permittivity_imag = 1 + (term * dipole_angst_imag)
-    permittivity_real = 1 + (term * dipole_angst_real)
-
+    permittivity_imag = ( (dipole_cgs_imag))
+    permittivity_real = ( (dipole_cgs_real))
+    
     return permittivity_imag, permittivity_real
 
 
@@ -329,7 +321,7 @@ def plot_results(num_steps, dipole_correlation_result, PHI_derivative, negative_
     plt.tight_layout()
     
     # Convert frequencies from Hz to eV
-    freqs_eV = freqs #* 4.1357e-15
+    freqs_eV = freqs * 4.1357e-15
 
     # Plot the real part of the Fourier transform
     plt.figure(figsize=(8, 6))
@@ -434,17 +426,15 @@ if __name__ == "__main__":
     negative_PHI_derivative = - PHI_derivative
 
     # Information for the fft. The sampling rate is 1 / time between samples
-    #   aimd time step is 2e-15 and currently we are taking a sample
-    #   every 500 time steps.
+    #   aimd time step can vary, so check this when you run VASP.
     # Notes about the Nyquist frequency:
-    #   The Nyquist frequency is half of the sampling rate and 
+    #   The Nyquist frequency is half of the sampling frequency and 
     #   represents the highest frequency that can be accurately 
     #   captured when sampling a continuous signal. Meaning that
-    #   a sampling_step of 500 (1THz) will capture up to 500 GHz.
-    #   If you want to sample up to 6 THz, you would nee a 
-    #   sampling_step of 42. Nyquist frequency is 1/2 the 
-    #   sampling_rate (sr). Frequency "f" you want in Hz convert to cycles/sec
-    #   sr = 1/f then sr/aimd_time_step. Then /2.
+    #   a sampling_step of 333 (3THz) will capture up to 1.5THz.
+    #   
+    #   To ensure that your sampling rate is correct, please run the script
+    #   calculateSamplingRate.py
     real_fft, imag_fft, freqs = perform_fft(negative_PHI_derivative, sampling_rate)
 
     # Apply the constants and calculate permittivity

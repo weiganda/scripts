@@ -15,7 +15,7 @@ sub printHelp
 #  -sr <rate>       Set the sampling rate. This will sample every <rate> configuration and create skl files.
 #  -sn <number>     Set the sample number (single). This will pull a single configuration (<number>) and create a skl file.
 #  -d               Enable dipole flag. Only for use with dipole series. 
-#  -skl             This will print skl as olcao.skl.<config_number>. Must not be activated for -d. If not activated skl files will overwrite eachother.
+#  -skl             This will print skl as olcao.skl.<config_number>. Must be activated for -d. If not activated skl files will overwrite eachother.
 #  -h, -help        Show this help message and exit
 #
 ###############################################################################
@@ -361,7 +361,7 @@ sub readVASP
             }
          }
 
-         # We only want to print out the skl files that fall within out sampling rate
+         # We only want to print out the skl files that fall within our sampling rate
          if ($seriesFlag == 1)
          {
             if ($i % $samplingRate == 0 or $i == 1)
@@ -383,7 +383,7 @@ sub readVASP
                if ($dipoleFlag == 1 and $sklPrintFlag == 0)
                {
                   system("seriesData.py") == 0
-                  or die "Failed to execute seriesData.py:  $!";
+                     or die "Failed to execute seriesData.py:  $!";
                }
                else
                {
@@ -444,7 +444,7 @@ HEADER
    print SKL <<TRAILING;
 space 1_a
 supercell 1 1 1
-prim
+full
 TRAILING
 
    # Close the SKL output file.

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -51,11 +53,16 @@ def process_file(filename):
 
 # Read and process the file
 filename = 'XDATCAR'  # Change this to the path of your XDATCAR file
-volumes = process_file(filename)
+volumes =  process_file(filename)
+
+# Calculate average volume
+avg_volume = np.mean(volumes)
+
 
 # Plot the volumes
 plt.figure(figsize=(10, 6))
 plt.plot(volumes, label='Unit Cell Volume', color='b', marker='o')
+plt.axhline(avg_volume, color='r', linestyle='-', linewidth=2, label=f'Average Volume = {avg_volume:.2f}')
 plt.xlabel('Repetition Number')
 plt.ylabel('Volume (cubic units)')
 plt.title('Unit Cell Volume for Each Repetition')

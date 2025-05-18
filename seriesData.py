@@ -36,9 +36,10 @@ def execute_command(command):
 
 def main():
     destination_file = "olcao.skl"
-    makeinput_command = "makeinput -kp 1 1 1"
+    makeinput_command = "makeinput -kp 1 1 1 -nocore"
     olcao_command = "olcao -scfdimo"
     remove_files = "rm olcao.skl *.dat *.out"
+    remove_nuc_file = "rm intermediate/fort.207"
     remove_folders = "rm -r i*"
 
     # Initial file counter for olcao.skl files
@@ -101,6 +102,7 @@ def main():
                     
         # Remove previous data files
         execute_command(remove_files)
+        execute_command(remove_nuc_file)
         execute_command(remove_folders)
         # Increment file counter
         file_counter += 1

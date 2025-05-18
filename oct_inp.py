@@ -28,7 +28,7 @@ print("File 'inp' has been created successfully.")
 
 
 # Define the content to be written to the file
-content2 = """
+content2 = f"""
 
 #!/bin/bash
 #SBATCH -p general
