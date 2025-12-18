@@ -13,10 +13,13 @@ parser = argparse.ArgumentParser(description="Convert CIF to POSCAR with probabi
 parser.add_argument('-f', '--file', type=str, required=True, help='Input CIF file')
 args = parser.parse_args()
 
-# Load CIF file
+# Load CIF file with occupancy tolerance
 cif_file = args.file
-parser = CifParser(cif_file)
-structure_raw = parser.get_structures(primitive=False)[0]
+parser = CifParser(cif_file, occupancy_tolerance=1.05)
+structures = parser.parse_structures(primitive=False)
+if not structures:
+    raise ValueError(f"No valid structure parsed from {cif_file}")
+structure_raw = structures[0]
 
 # Extract raw data: label, fractional coords, occupancy, and element
 raw_data = []
@@ -32,23 +35,33 @@ for label, coords, occ, elem in raw_data:
     key = tuple(np.round(coords, decimals=5))
     coord_dict[key].append((elem, occ))
 
-# Probabilistic atom selection
-coords = []
-species = []
-for pos, occupants in coord_dict.items():
-    total_occ = sum(o[1] for o in occupants)
-    if total_occ == 0:
-        continue
-    normed_probs = [o[1]/total_occ for o in occupants]
-    selected = random.choices([o[0] for o in occupants], weights=normed_probs, k=1)[0]
-    species.append(Element(selected))
-    coords.append(pos)
+for i in range(10):
+    # Probabilistic atom selection
+    coords = []
+    species = []
+    for pos, occupants in coord_dict.items():
+        total_occ = sum(o[1] for o in occupants)
+        if total_occ == 0:
+            continue
+        normed_probs = [o[1]/total_occ for o in occupants]
+        selected = random.choices([o[0] for o in occupants], weights=normed_probs, k=1)[0]
+        species.append(Element(selected))
+        coords.append(pos)
 
-# Build structure
-structure = Structure(structure_raw.lattice, species, coords)
+    # Build structure
+    structure = Structure(structure_raw.lattice, species, coords)
 
-# Write to POSCAR
-poscar = Poscar(structure)
-poscar.write_file("POSCAR_PartialOcc.vasp")
-print("Wrote POSCAR to POSCAR_PartialOcc.vasp")
+    # Write to POSCAR
+    poscar = Poscar(structure)
+    poscar.write_file(f"POSCAR_PartialOcc_{i}.vasp")
+    print(f"Wrote POSCAR to POSCAR_PartialOcc{i}.vasp")
 
+    # Determine unique species in POSCAR order
+    unique_species = poscar.site_symbols
+
+    # Write matching POTCAR
+    potcar_filename = f"POTCAR_PartialOcc_{i}.vasp"
+    with open(potcar_filename, 'w') as f:
+        for el in unique_species:
+            f.write(f"TITEL = DUMMY DUMMY {el}_pv\n")
+    print(f"Wrote POTCAR to {potcar_filename}")

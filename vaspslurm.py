@@ -10,20 +10,20 @@ def create_slurm_file():
     directory_name = os.path.basename(current_directory)
 
     slurm_content = f"""#!/bin/bash
-#SBATCH -p general
+#SBATCH -p rulisp-lab
+#SBATCH -A rulisp-lab
 #SBATCH -J "{directory_name}"
 #SBATCH -o "{directory_name}.o%J"
 #SBATCH -e "{directory_name}.e%J"
 #SBATCH -N 1
-#SBATCH -n 6
+#SBATCH -n 64
 #SBATCH -t 47:00:00
 #SBATCH --mem=30G
 #
 
 cd {current_directory}
 
-export MV2_ENABLE_AFFINITY=0
-mpirun -n 6 vasp_gam
+mpirun -n 64 vasp_gam
 """
 
     # Write the content to a SLURM file
