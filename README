@@ -1,0 +1,7 @@
+This is the process
+
+git add .
+
+git commit -m "updates"
+
+get push origin main
