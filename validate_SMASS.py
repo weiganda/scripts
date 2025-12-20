@@ -1,5 +1,39 @@
 #!/usr/bin/env python3
 
+"""
+Created by: Alysse Weigand
+Last Updated: 12/20/2025
+
+Development Notes:
+- Conceptual design, purpose, and validation by Alysse Weigand.
+- All scientific reasoning, method choices, and interpretation of results by Alysse Weigand.
+- Code implementation and structure assisted by ChatGPT.
+
+SMASS Validation Script
+
+This script is used to determine and validate the thermostat mass (SMASS) for NVT 
+molecular dynamics simulations. It monitors the temperature fluctuations of the 
+system and compares them to the expected statistical values to ensure the thermostat 
+is neither too weak nor too strong. 
+
+This script is intended to be used after the POTIM value has been validated using
+an NVE ensemble and and validate_POTIM.py script. 
+
+Usage:
+- Run this script before production NVT simulations to choose an appropriate SMASS.
+- Analyze temperature fluctuations to select a SMASS that maintains stable and accurate 
+  temperature control.
+
+Intuition for Students:
+
+- SMASS is the “thermostat mass” that controls how quickly the system responds to temperature fluctuations.
+- Too small → thermostat reacts too fast → temperature oscillates (underdamped).
+- Too large → thermostat reacts too slowly → temperature barely fluctuates (overdamped).
+- Ideal → critically damped: temperature fluctuates around the mean naturally, consistent with canonical ensemble.
+- This script analyzes NVT temperature data to suggest whether SMASS is appropriate.
+
+"""
+
 import re
 import matplotlib.pyplot as plt
 import numpy as np
@@ -122,6 +156,7 @@ def autocorr(x):
 
 if temperatures:
     # Steady-state temperatures (last 50%)
+    #   Using the last half avoids initial equilibrium effects
     n_temp = len(temperatures)
     start_idx = n_temp // 2
     temperatures_steady = np.array(temperatures[start_idx:])
@@ -210,6 +245,7 @@ if temperatures:
     coeffs_temp = np.polyfit(steps_temp_steady, temperatures_steady, 1)
     slope_temp = coeffs_temp[0] * 1e3 / POTIM_fs  # K/ps
 
+    # Expected statistical fluctuation in a canonical ensemble (3 Degrees of Freedom per atom)
     expected_sigma = avg_temp / np.sqrt(3 * N_atoms)
 
     print(f"\n--- Temperature Analysis (SMASS) [last 50% only] ---")
@@ -249,7 +285,7 @@ if temperatures:
 #   focus on SMASS (thermostat) or PMASS (barostat), not the timestep.
 #
 # ------------------------------------------------------------------
-# Suggestions Block Explanation
+# Suggestions Explanation
 # ------------------------------------------------------------------
 #
 # This block provides guidance for adjusting SMASS based on observed
@@ -328,6 +364,9 @@ if temperatures:
 
 print("\n------------- Suggestions (Improved) -------------")
 
+# Severity factor quantifies how far the observed fluctuations deviate from theory; used to scale
+#   SMASS adjustments. Again, this is just a best guess to help guide future SMASS choices.
+
 if temperatures_steady is not None:
     # -------------------------------
     # Base severity from std deviation
@@ -392,6 +431,14 @@ if temperatures_steady is not None:
 print(f"---------------------------------------\n")
 print("\nNote: Once POTIM is validated via NVE drift, only SMASS and PMASS should be adjusted.")
 
+print("\n---------------- Tips for Students ----------------")
+print("1. POTIM should already be validated using NVE drift; do NOT change timestep here.")
+print("2. SMASS controls thermostat damping; aim for critically damped response.")
+print("3. Check temperature fluctuation vs expected σ_T: too high → increase SMASS; too low → decrease SMASS.")
+print("4. Use temperature autocorrelation plot to visually inspect damping behavior.")
+print("5. Effective sample size (N_eff) should be > 30 for reliable statistics; otherwise run longer.")
+print("6. Adjust SMASS incrementally; avoid large jumps.")
+print("--------------------------------------------------\n")
 
     
 # ------------------------------------------------
@@ -481,4 +528,6 @@ if temperatures:
     plt.legend()
     plt.grid(True)
     plt.show()
+
+
 

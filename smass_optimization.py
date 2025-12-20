@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 """
+Created by: Alysse Weigand
+Last Updated: 12/20/2025
+
+Development Notes:
+- Conceptual design, purpose, and validation by Alysse Weigand.
+- All scientific reasoning, method choices, and interpretation of results by Alysse Weigand.
+- Code implementation and structure assisted by ChatGPT.
+
 ================================================================================
 SMASS Optimization from Multiple NPT Runs (Robust Version)
 ================================================================================

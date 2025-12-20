@@ -1,4 +1,36 @@
 #!/usr/bin/env python3
+"""
+Created by: Alysse Weigand
+Last Updated: 12/20/2025
+
+Development Notes:
+- Conceptual design, purpose, and validation by Alysse Weigand.
+- All scientific reasoning, method choices, and interpretation of results by Alysse Weigand.
+- Code implementation and structure assisted by ChatGPT.
+
+POTIM Validation Script
+
+This script is used to test and validate the MD timestep (POTIM) for a given system 
+by running short NVE molecular dynamics simulations. The main goal is to monitor 
+the energy drift and ensure that the chosen POTIM produces stable dynamics without 
+significant numerical errors. 
+
+Usage:
+- Run this script before production MD simulations to determine an appropriate POTIM.
+- Analyze the energy drift to select a timestep that keeps drift below an acceptable threshold.
+
+Intuition for Students:
+
+- POTIM (timestep) must be small enough to accurately capture the fastest vibrations in the material.
+- Too large → energy drift increases, simulation unstable.
+- Too small → simulation safe but inefficient (wastes time).
+- This script analyzes NVE energy data to suggest whether POTIM is appropriate.
+- If you are using this script with a future application of specta / FFT analysis, your
+    POTIM value may be smaller than it needs to be and that is ok. You just need to ensure
+    that the value you have chosen is approprate for the sampling rate that you need and that
+    it is stable. You can check the sampling rate with calculateSamplingRate.py   
+    Use -h to get the information and formatting that is needed as input. 
+"""
 
 import re
 import matplotlib.pyplot as plt
@@ -7,6 +39,7 @@ import numpy as np
 # -------------------------
 # Read N_atoms from OUTCAR
 # -------------------------
+#   Needed to normalize the energy drift per atom (eV/atom/ps)
 N_atoms = None
 with open("OUTCAR") as f:
     for line in f:
@@ -81,7 +114,7 @@ print("-------------------------------------------\n")
 # -----------------------------
 # Nyquist Frequency
 # -----------------------------
-dt_ps = POTIM_fs * 1e-3
+dt_ps = POTIM_fs * 1e-3 #Convert timesetp from fs to ps for Nyquist freq calc. 
 nyquist_Hz = 1e12 / (2 * dt_ps)
 print("\n------------ Nyquist Frequency ------------")
 print(f"Nyquist frequency = {nyquist_Hz:.2e} Hz")
@@ -94,8 +127,8 @@ print("-------------------------------------------\n")
 # ------------------------------------------
 # This calculation estimates how many samples are present in the MD trajectory.
 # Consecutive MD steps are correlated, meaning that not every temperature or energy value 
-# represents a truly independent observation. Using all steps without accounting for correlation 
-# would overestimate the statistical reliability of averages and fluctuations.
+#   represents a truly independent observation. Using all steps without accounting for correlation 
+#    would overestimate the statistical reliability of averages and fluctuations.
 #
 # The procedure is as follows:
 #
@@ -117,7 +150,7 @@ print("-------------------------------------------\n")
 #       - N_eff >> 30 is considered very reliable statistics, below this is unreliable. 
 #
 # This analysis ensures that computed averages, standard deviations, or drift calculations
-# are based on statistically meaningful data rather than raw step counts.
+#   are based on statistically meaningful data rather than raw step counts.
 #
 # Estimate correlation time for temperature
 def autocorr(x):
@@ -129,7 +162,10 @@ def autocorr(x):
     return c[n-1:]
 
 c_temp = autocorr(temperatures)
+
+#Rough estimate of how many steps are correlated. Helps evaluate the sample size
 tau_corr = np.where(c_temp < 0.1)[0][0]  # first index where autocorr < 0.1
+
 N_eff = len(temperatures) / tau_corr
 print("\n--------------- Sample Size ---------------")
 print(f"Estimated correlation time = {tau_corr} steps, N_eff = {N_eff:.1f} independent samples")
@@ -200,6 +236,8 @@ if total_energies:
 
     # Drift calculations
     drift_basic = abs(deltaE_basic / (N_atoms * t_total_ps))
+
+    # Use the last half of trajectory to aviod initial equilibration artifacts
     drift_slope = abs(deltaE_slope / (N_atoms * t_total_ps))
     
     print(f"\n--------------- Drift Energy --------------")
@@ -302,6 +340,15 @@ else:  # drift_slope > 1e-4
     print("ALERT: POTIM is too large!!! Needs a smaller timestep.")
 
 print(f"-------------------------------------------\n")
+
+
+print("\n--------------- Tips for Students ---------------")
+print("1. If drift is too high, reduce POTIM.")
+print("2. Check energy linearity (R²). If low, simulation may be unstable.")
+print("3. Look at plots to visually inspect stability.")
+print("4. Remember: small POTIM is safe but slower; balance speed and accuracy.")
+print("-----------------------------------------------\n")
+
 
    
 # -------------------------
